@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Bicisenda</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+            position: relative;
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid white;
+            width: 100%;
+            max-width: 800px; /* Limita el ancho máximo del canvas */
+            height: auto;
+        }
+        #message {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            display: none;
+        }
+        #qrCode {
+            margin-top: 20px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.0/qrious.min.js"></script>
+</head>
+<body>
+    <div id="message">¡Bien hecho!</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="qrCode"></div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageDiv = document.getElementById('message');
+
+        let player = { x: 750, y: 580, radius: 5 }; 
+        let pathWidth = 10; 
+        let pathCompleted = false; 
+        let currentLevel = 0; // Nivel actual
+
+        // Define los caminos y los puntos por nivel
+        let levels = [
+            {
+                paths: [{ x: 50, y: 300, width: 700, height: pathWidth }], // Nivel 1
+                points: [
+                    { x: 50, y: 300 },   // izquierda
+                    { x: 400, y: 300 },  // medio
+                ]
+            },
+            {
+                paths: [
+                    { x: 50, y: 50, width: pathWidth, height: 500 },
+                    { x: 50, y: 50, width: 700, height: pathWidth },
+                    { x: 50, y: 550, width: 700, height: pathWidth },
+                    { x: 750, y: 50, width: pathWidth, height: 500 }
+                ],
+                points: [
+                    { x: 50, y: 50 },    // esquina superior izquierda
+                    { x: 750, y: 50 },   // esquina superior derecha
+                    { x: 50, y: 550 },   // esquina inferior izquierda
+                    { x: 750, y: 550 },  // esquina inferior derecha
+                    { x: 400, y: 50 },   // punto medio arriba
+                    { x: 50, y: 300 },   // punto medio izquierda
+                    { x: 750, y: 300 },  // punto medio derecha
+                    { x: 400, y: 550 }    // punto medio abajo
+                ]
+            },
+            {
+                paths: [
+                    { x: 50, y: 50, width: 10, height: 550 },
+                    { x: 50, y: 50, width: 700, height: 10 },
+                    { x: 750, y: 50, width: 10, height: 550 },
+                    { x: 50, y: 550, width: 700, height: 10 },
+                    { x: 150, y: 50, width: 10, height: 300 }, // Zig zag vertical
+                    { x: 150, y: 350, width: 10, height: 200 }, // Zig zag vertical
+                    { x: 650, y: 50, width: 10, height: 300 }, // Zig zag vertical
+                    { x: 650, y: 350, width: 10, height: 200 }  // Zig zag vertical
+                ],
+                points: [
+                    { x: 50, y: 50 },    // esquina superior izquierda
+                    { x: 750, y: 50 },   // esquina superior derecha
+                    { x: 50, y: 550 },   // esquina inferior izquierda
+                    { x: 750, y: 550 },  // esquina inferior derecha
+                    { x: 150, y: 300 },  // medio izquierda
+                    { x: 650, y: 300 },  // medio derecha
+                    { x: 400, y: 50 },   // medio arriba
+                    { x: 400, y: 550 }    // medio abajo
+                ]
+            }
+        ];
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPath();
+            drawPlayer();
+            drawColorPoints();
+            checkPlayerPosition();
+        }
+
+        function drawPath() {
+            ctx.fillStyle = '#FFFFFF';
+            levels[currentLevel].paths.forEach(path => {
+                ctx.fillRect(path.x, path.y, path.width, path.height);
+            });
+        }
+
+        function drawColorPoints() {
+            levels[currentLevel].points.forEach(point => {
+                const color = getPointColor(point.x, point.y);
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            });
+        }
+
+        function getPointColor(x, y) {
+            const distance = getMouseDistance(x, y);
+            if (distance < 20) {
+                return 'red';
+            } else if (distance < 40) {
+                return 'orange';
+            } else {
+                return 'white';
+            }
+        }
+
+        function getMouseDistance(x, y) {
+            const mouseX = player.x;
+            const mouseY = player.y;
+            return Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = 'blue';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function checkPlayerPosition() {
+            // Comprueba si el jugador ha llegado al final del nivel 1
+            if (currentLevel === 0 && player.x <= 50 && player.y >= 295 && player.y <= 305) {
+                nextLevel();
+            } else if (currentLevel === 1 && player.x >= 750 && player.x <= 770 && player.y >= 290 && player.y <= 310) {
+                nextLevel();
+            } else if (currentLevel === 2 && player.x >= 50 && player.x <= 750 && player.y >= 550 && player.y <= 570) {
+                nextLevel();
+            }
+        }
+
+        function nextLevel() {
+            if (currentLevel < levels.length - 1) {
+                currentLevel++;
+                resetPlayer();
+                showMessage();
+            }
+        }
+
+        function resetPlayer() {
+            player.x = 750; 
+            player.y = 580;
+            pathCompleted = false; 
+            messageDiv.style.display = 'none';
+        }
+
+        function showMessage() {
+            messageDiv.style.display = 'block';
+        }
+
+        function movePlayer(event) {
+            const rect = canvas.getBoundingClientRect();
+            player.x = event.clientX - rect.left;
+            player.y = event.clientY - rect.top;
+
+            // Reinicia la posición si el jugador sale del camino
+            if (!isOnPath(player.x, player.y)) {
+                resetPlayer();
+            }
+        }
+
+        function isOnPath(x, y) {
+            return levels[currentLevel].paths.some(path => 
+                (x >= path.x && x <= path.x + path.width && y >= path.y && y <= path.y + path.height)
+            );
+        }
+
+        // Generar código QR
+        function generateQRCode() {
+            const qr = new QRious({
+                element: document.getElementById('qrCode'),
+                value: window.location.href,
+                size: 200
+            });
+        }
+
+        canvas.addEventListener('mousemove', movePlayer);
+
+        function gameLoop() {
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Inicia el juego y genera el código QR
+        gameLoop();
+        generateQRCode();
+    </script>
+</body>
+</html>
